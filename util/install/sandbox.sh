@@ -1,0 +1,91 @@
+#!/bin/bash
+##
+## Installs the pre-requisites for running edX on a single Ubuntu 12.04
+## instance.  This script is provided as a convenience and any of these
+## steps could be executed manually.
+##
+## Note that this script requires that you have the ability to run
+## commands as root via sudo.  Caveat Emptor!
+##
+
+##
+## Sanity check
+##
+if [[ `lsb_release -rs` != "12.04" ]]; then
+   echo "This script is only known to work on Ubuntu 12.04, exiting...";
+   exit;
+fi
+
+##
+## Set ppa repository source for gcc/g++ 4.8 in order to install insights properly
+##
+sudo apt-get install -y python-software-properties
+sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+
+##
+## Update and Upgrade apt packages
+##
+sudo apt-get update -y
+sudo apt-get upgrade -y
+
+##
+## Install system pre-requisites
+##
+sudo apt-get install -y build-essential software-properties-common curl git-core libxml2-dev libxslt1-dev python-pip libmysqlclient-dev python-apt python-dev libxmlsec1-dev libfreetype6-dev swig gcc-4.8 g++-4.8
+sudo pip install --upgrade pip==8.1.2
+sudo pip install --upgrade setuptools==24.0.3
+sudo -H pip install --upgrade virtualenv==15.0.2
+
+##
+## Update alternatives so that gcc/g++ 4.8 is the default compiler
+##
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 50
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 50
+
+##
+## Overridable version variables in the playbooks. Each can be overridden
+## individually, or with $OPENEDX_RELEASE.
+##
+VERSION_VARS=(
+  edx_platform_version
+  certs_version
+  forum_version
+  xqueue_version
+  configuration_version
+  demo_version
+  NOTIFIER_VERSION
+  INSIGHTS_VERSION
+  ANALYTICS_API_VERSION
+)
+
+EXTRA_VARS=""
+for var in ${VERSION_VARS[@]}; do
+  # Each variable can be overridden by a similarly-named environment variable,
+  # or OPENEDX_RELEASE, if provided.
+  ENV_VAR=$(echo $var | tr '[:lower:]' '[:upper:]')
+  eval override=\${$ENV_VAR-\$OPENEDX_RELEASE}
+  if [ -n "$override" ]; then
+    EXTRA_VARS="-e $var=$override $EXTRA_VARS"
+  fi
+done
+
+CONFIGURATION_VERSION=${CONFIGURATION_VERSION-${OPENEDX_RELEASE-master}}
+
+##
+## Clone the configuration repository and run Ansible
+##
+cd /var/tmp
+git clone https://github.com/edx/configuration
+cd configuration
+git checkout $CONFIGURATION_VERSION
+
+##
+## Install the ansible requirements
+##
+cd /var/tmp/configuration
+sudo -H pip install -r requirements.txt
+
+##
+## Run the edx_sandbox.yml playbook in the configuration/playbooks directory
+##
+cd /var/tmp/configuration/playbooks && sudo ansible-playbook -c local ./edx_sandbox.yml -i "localhost," $EXTRA_VARS
