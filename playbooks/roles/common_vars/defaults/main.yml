@@ -68,7 +68,7 @@ COMMON_CUSTOM_DHCLIENT_CONFIG: false
 # uncomment and specifity your domains.
 # COMMON_DHCLIENT_DNS_SEARCH: ["ec2.internal","example.com"]
 
-COMMON_SSH_PASSWORD_AUTH: "no"
+COMMON_SSH_PASSWORD_AUTH: "yes"
 
 COMMON_SECURITY_UPDATES: no
 # These are three maintenance accounts across all databases
